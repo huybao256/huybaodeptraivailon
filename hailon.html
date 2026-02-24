@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Vault - 8/3 Special</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        :root {
+            --pink-pastel: #ffd1dc;
+            --purple-pastel: #e6e6fa;
+            --yellow-pastel: #fffacd;
+            --text-color: #5c4033;
+            --card-bg: #ffb6c1;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, var(--pink-pastel), var(--purple-pastel));
+            color: var(--text-color);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        header { text-align: center; margin-bottom: 15px; }
+        h1 { color: #d87093; font-size: 2.2rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        p.subtitle { font-size: 1.1rem; margin: 5px 0; font-weight: 600; }
+
+        /* Dashboard: Timer & Flips */
+        .dashboard {
+            display: flex;
+            gap: 20px;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 10px 25px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Leaderboard Panel */
+        .leaderboard-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            display: none; /* Hiện ra khi game kết thúc */
+        }
+        .leaderboard-title { text-align: center; color: #d87093; margin-top: 0; }
+        .lb-entry { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed var(--pink-pastel); }
+
+        /* Game Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            max-width: 600px;
+            width: 100%;
+            perspective: 1000px;
+        }
+
+        .card {
+            aspect-ratio: 1/1;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
+            cursor: pointer;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .card.flipped { transform: rotateY(180deg); }
+        .card.matched { visibility: hidden; opacity: 0; transition: visibility 0s 0.5s, opacity 0.5s; }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            padding: 10px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .card-front {
+            background: var(--card-bg);
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px);
+            color: white;
+            font-size: 2rem;
+            border: 3px solid white;
+        }
+
+        .card-back {
+            background: white;
+            transform: rotateY(180deg);
+            border: 3px solid var(--card-bg);
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .card-back img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+
+        /* Floating particles */
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            font-size: 1.5rem;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+
+        /* Input Name Screen */
+        #loginScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        #loginScreen input { padding: 10px 20px; font-size: 1.2rem; border: 2px solid var(--card-bg); border-radius: 20px; outline: none; text-align: center; font-family: 'Nunito'; }
+        #loginScreen button { margin-top: 15px; padding: 10px 30px; background: var(--card-bg); border: none; color: white; border-radius: 20px; font-size: 1.2rem; cursor: pointer; font-family: 'Nunito'; font-weight: bold;}
+
+        @media (max-width: 500px) {
+            .grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .card-back { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <h2 style="color: #d87093">Đăng nhập vào Class Vault 💌</h2>
+        <input type="text" id="playerName" placeholder="Nhập tên của bạn...">
+        <button onclick="startGame()">Bắt đầu giải mã</button>
+    </div>
+
+    <header>
+        <h1>🌸 CLASS VAULT 🌸</h1>
+        <p class="subtitle">Tìm đúng kỷ niệm - Mở khóa trái tim</p>
+    </header>
+
+    <div class="dashboard">
+        <div>⏳ <span id="timer">90</span>s</div>
+        <div>🔄 Lượt lật: <span id="flips">0</span></div>
+    </div>
+
+    <div class="leaderboard-container" id="leaderboard">
+        <h3 class="leaderboard-title">🏆 Bảng Xếp Hạng Lớp 🏆</h3>
+        <div id="lb-content"></div>
+    </div>
+
+    <div class="grid" id="gameGrid"></div>
+
+    <script>
+        // --- NỘI DUNG CÁ NHÂN HÓA ---
+        // Mỗi cặp có chung 1 ID. Loại 'img' là ảnh, loại 'text' là caption tương ứng.
+        const deckData = [
+            { id: 1, type: 'text', content: 'Cổng trường Lê Quý Đôn 🏫' },
+            { id: 1, type: 'text', content: 'Nơi lưu giữ thanh xuân của chúng mình ✨' },
+            
+            { id: 2, type: 'text', content: 'Cỗ máy nhảy đỉnh nóc của PECY 💃' }, // Caption vui
+            { id: 2, type: 'img', content: 'https://via.placeholder.com/150/FFB6C1/FFFFFF?text=Anh+Dance+Club' }, // Thay bằng link ảnh thật
+            
+            { id: 3, type: 'text', content: 'Chiến thần cày đề NEC ✍️' },
+            { id: 3, type: 'img', content: 'https://via.placeholder.com/150/FFD1DC/5c4033?text=Anh+Hoc+Tap' },
+            
+            { id: 4, type: 'text', content: 'Đam mê bất diệt giờ ra chơi 🧋' },
+            { id: 4, type: 'img', content: 'https://via.placeholder.com/150/E6E6FA/5c4033?text=Banh+Trang+Tra+Sua' },
+            
+            { id: 5, type: 'text', content: 'Thánh ngủ gật tiết Lịch sử 📜' },
+            { id: 5, type: 'img', content: 'https://via.placeholder.com/150/FFFACD/5c4033?text=Anh+Dim+Nam' },
+            
+            { id: 6, type: 'text', content: 'Đẹp trai nhất lớp 😎' },
+            { id: 6, type: 'text', content: '(Là bọn con trai tự nhận vậy đó)' }
+        ];
+
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let flips = 0;
+        let timeLeft = 90;
+        let timerInterval;
+        let currentPlayer = "";
+        const totalPairs = deckData.length / 2;
+
+        function startGame() {
+            const nameInput = document.getElementById('playerName').value.trim();
+            if (!nameInput) return alert("Cậu nhập tên để nhận quà nhé!");
+            currentPlayer = nameInput;
+            document.getElementById('loginScreen').style.display = 'none';
+            initBoard();
+            startTimer();
+        }
+
+        function initBoard() {
+            const grid = document.getElementById('gameGrid');
+            grid.innerHTML = '';
+            cards = [...deckData].sort(() => Math.random() - 0.5);
+            
+            cards.forEach((data, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.id = data.id;
+                
+                const backContent = data.type === 'img' ? `<img src="${data.content}" alt="memory">` : data.content;
+                
+                card.innerHTML = `
+                    <div class="card-face card-front">💌</div>
+                    <div class="card-face card-back">${backContent}</div>
+                `;
+                card.addEventListener('click', () => handleCardClick(card));
+                grid.appendChild(card);
+            });
+        }
+
+        function handleCardClick(card) {
+            if (flippedCards.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+            card.classList.add('flipped');
+            flippedCards.push(card);
+            
+            if (flippedCards.length === 2) {
+                flips++;
+                document.getElementById('flips').innerText = flips;
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [c1, c2] = flippedCards;
+            const isMatch = c1.dataset.id === c2.dataset.id;
+
+            if (isMatch) {
+                matchedPairs++;
+                createParticles(c1); createParticles(c2);
+                
+                setTimeout(() => {
+                    c1.classList.add('matched');
+                    c2.classList.add('matched');
+                    flippedCards = [];
+                    if (matchedPairs === totalPairs) handleWin();
+                }, 600);
+            } else {
+                setTimeout(() => {
+                    c1.classList.remove('flipped');
+                    c2.classList.remove('flipped');
+                    flippedCards = [];
+                }, 1000); // Úp lại sau 1s
+            }
+        }
+
+        function createParticles(cardElement) {
+            const rect = cardElement.getBoundingClientRect();
+            const particles = ['💖', '✨', '⭐'];
+            for(let i = 0; i < 3; i++) {
+                const p = document.createElement('div');
+                p.classList.add('particle');
+                p.innerText = particles[Math.floor(Math.random() * particles.length)];
+                p.style.left = rect.left + (Math.random() * rect.width) + 'px';
+                p.style.top = rect.top + 'px';
+                document.body.appendChild(p);
+                setTimeout(() => p.remove(), 1000);
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) handleLose();
+            }, 1000);
+        }
+
+        function handleWin() {
+            clearInterval(timerInterval);
+            const timeTaken = 90 - timeLeft;
+            saveScore(currentPlayer, timeTaken, flips);
+            
+            // Hiệu ứng pháo hoa
+            const duration = 3 * 1000;
+            const end = Date.now() + duration;
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#ffb6c1', '#e6e6fa'] });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#ffb6c1', '#e6e6fa'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+
+            // Thư chúc mừng SweetAlert
+            Swal.fire({
+                title: 'VAULT UNLOCKED! 🗝️',
+                html: `
+                    <div style="text-align: left; font-family: 'Nunito', sans-serif;">
+                        <b>Dear ${currentPlayer},</b><br><br>
+                        Chúc mừng cậu đã giải mã thành công trong <b>${timeTaken}s</b>!<br><br>
+                        Dù là những mật mã hóc búa hay những deadline ngập đầu, các cậu vẫn luôn tỏa sáng theo cách tuyệt vời nhất. Cảm ơn vì đã luôn là những 'nàng thơ' đáng yêu của lớp mình.<br><br>
+                        <i>Giờ thì hãy nhìn ra cửa lớp để nhận món quà ngọt ngào tụi tớ đã chuẩn bị nhé! Happy Women's Day! 💖</i>
+                    </div>
+                `,
+                imageUrl: 'https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif',
+                imageWidth: 200,
+                imageAlt: 'Cute Heart',
+                confirmButtonText: 'Nhận Quà Thôi! 🎁',
+                confirmButtonColor: '#ffb6c1'
+            }).then(() => showLeaderboard());
+        }
+
+        function handleLose() {
+            clearInterval(timerInterval);
+            Swal.fire({
+                icon: 'error',
+                title: 'Hết giờ mất rồi! ⏳',
+                text: 'Mật mã quá khó đúng không? Nhưng đừng lo, các bạn nam vẫn có quà cho cậu!',
+                confirmButtonColor: '#ffb6c1'
+            });
+        }
+
+        // Leaderboard giả lập dùng LocalStorage
+        function saveScore(name, time, moves) {
+            let scores = JSON.parse(localStorage.getItem('classVaultScores')) || [];
+            scores.push({ name, time, moves });
+            scores.sort((a, b) => a.time - b.time || a.moves - b.moves); // Ưu tiên thời gian, sau đó đến số lượt lật
+            localStorage.setItem('classVaultScores', JSON.stringify(scores));
+        }
+
+        function showLeaderboard() {
+            document.getElementById('gameGrid').style.display = 'none';
+            document.querySelector('.dashboard').style.display = 'none';
+            const lbContainer = document.getElementById('leaderboard');
+            const lbContent = document.getElementById('lb-content');
+            lbContainer.style.display = 'block';
+            
+            let scores = JSON.parse(localStorage.getItem('classVaultScores')) || [];
+            lbContent.innerHTML = scores.slice(0, 10).map((s, i) => 
+                `<div class="lb-entry">
+                    <span><b>#${i+1}</b> ${s.name}</span>
+                    <span>⏱️ ${s.time}s | 🔄 ${s.moves} lượt</span>
+                </div>`
+            ).join('');
+        }
+    </script>
+</body>
+</html>
